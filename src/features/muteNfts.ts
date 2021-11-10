@@ -18,15 +18,15 @@ export const muteNftAvatars = makeBTDModule(({TD, jq, settings}) => {
     }
   });
 
-  TD.services.TwitterUser.prototype.OGFromJSON = TD.services.TwitterUser.prototype.fromJSONObject;
+  // TD.services.TwitterUser.prototype.OGFromJSON = TD.services.TwitterUser.prototype.fromJSONObject;
 
-  TD.services.TwitterUser.prototype.fromJSONObject = function fromJSONObject(blob: any) {
-    var baseTweet = this.OGFromJSON(blob);
+  // TD.services.TwitterUser.prototype.fromJSONObject = function fromJSONObject(blob: any) {
+  //   var baseTweet = this.OGFromJSON(blob);
 
-    baseTweet.hasNftAvatar = Boolean(blob.ext_has_nft_avatar);
+  //   baseTweet.hasNftAvatar = Boolean(blob.ext_has_nft_avatar);
 
-    return baseTweet;
-  };
+  //   return baseTweet;
+  // };
 
   jq(document).on('TD.ready', () => {
     setTimeout(() => {
