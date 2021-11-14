@@ -206,7 +206,7 @@ export const maybeAddTweetActions = makeBTDModule(({settings, TD, jq, mR}) => {
     }
     const media = getMediaFromChirp(chirp);
     const mediaPromises = media.map((item) => {
-      return requestMediaItem(item);
+      return requestMediaItem(item.url);
     });
 
     const maybeResults = await Promise.all(mediaPromises);
@@ -221,7 +221,7 @@ export const maybeAddTweetActions = makeBTDModule(({settings, TD, jq, mR}) => {
           file,
           TD.ui.template.render(
             'btd/download_filename_format',
-            getFilenameDownloadData(chirp, media[index])
+            getFilenameDownloadData(chirp, media[index].url)
           )
         );
       } catch (e) {
@@ -352,8 +352,11 @@ export const maybeAddTweetActions = makeBTDModule(({settings, TD, jq, mR}) => {
           });
           return;
 
-        case TweetActions.MUTE_ACCOUNT:
-          if (!confirm(`Are you sure you want to mute @${user.screenName}?`)) {
+        case TweetActions.MUTE_ACCOUNT: {
+          const blocked = settings.requireConfirmationForTweetAction
+            ? !confirm(`Are you sure you want to mute @${user.screenName}?`)
+            : false;
+          if (blocked) {
             return;
           }
           jq(document).trigger('uiMuteAction', {
@@ -361,9 +364,13 @@ export const maybeAddTweetActions = makeBTDModule(({settings, TD, jq, mR}) => {
             twitterUser: user,
           });
           return;
+        }
 
-        case TweetActions.BLOCK_ACCOUNT:
-          if (!confirm(`Are you sure you want to block @${user.screenName}?`)) {
+        case TweetActions.BLOCK_ACCOUNT: {
+          const blocked = settings.requireConfirmationForTweetAction
+            ? !confirm(`Are you sure you want to block @${user.screenName}?`)
+            : false;
+          if (blocked) {
             return;
           }
           jq(document).trigger('uiBlockAction', {
@@ -371,6 +378,7 @@ export const maybeAddTweetActions = makeBTDModule(({settings, TD, jq, mR}) => {
             twitterUser: user,
           });
           return;
+        }
       }
     }
   );
