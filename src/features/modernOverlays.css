@@ -1,4 +1,13 @@
 [btd-modern-overlays='true'] {
+  /* Bigger native videos. */
+  & .js-modal-panel .l-table .l-cell .js-media-native-video {
+    max-height: 80vh !important;
+    max-width: 80vw !important;
+    height: 100% !important;
+    width: 100% !important;
+    object-fit: contain !important;
+  }
+
   & .js-mediatable .js-modal-panel .med-tweet .js-tweet > :not(.tweet-footer),
   & .js-mediatable .js-modal-panel .med-embeditem .med-tray .media-preview-container ~ a {
     display: none;
@@ -24,10 +33,6 @@
 
   & .js-mediatable .js-modal-panel .med-tweet .js-tweet .tweet-footer .tweet-actions .icon {
     font-size: 24px !important;
-  }
-
-  & .js-mediatable .js-modal-panel .med-tweet .js-tweet .tweet-footer .tweet-actions .btd-tweet-action-item {
-    display: none !important;
   }
 
   & .js-mediatable .js-modal-panel .med-embeditem {
