@@ -17,7 +17,7 @@ export interface TweetDeckBitlyAccount {
 export type TweetDeckColumnWidth = 'wide' | 'medium' | 'narrow' | 'custom';
 export type TweetDeckFontSize = 'smallest' | 'small' | 'medium' | 'large' | 'largest';
 
-declare class TweetDeckFilter {
+export declare class TweetDeckFilter {
   value: string;
   type: string;
   getDisplayType(): string;
@@ -215,6 +215,14 @@ interface TweetDeckController {
       exact: boolean;
       id: string;
     }): void;
+    _removeFilter(filter: {
+      type: string;
+      value: string;
+      positive: boolean;
+      exact: boolean;
+      id: string;
+    }): void;
+    _addFilter(type: string, value: string): void;
     addFilter(type: string, value: string): void;
     getAll(): ReadonlyArray<{
       type: string;

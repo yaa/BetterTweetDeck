@@ -26,10 +26,10 @@
  *
  */
 
+import {makeEnumRuntimeType} from '../helpers/runtimeTypeHelpers';
 import {makeBTDModule} from '../types/btdCommonTypes';
 import {TweetDeckChirp, TweetDeckObject} from '../types/tweetdeckTypes';
-
-type AMEFiltersMap = {[k: string]: AMEFilter};
+import {maybeLogMuteCatch, removeCatchesByFilter} from './mutesCatcher';
 
 interface AMEFilter {
   name: string;
@@ -51,10 +51,32 @@ interface AMEFilterOptions {
   nameInDropdown?: string;
 }
 
+type AMEFiltersMap = {[k in AMEFilters]: AMEFilter};
+
+export enum AMEFilters {
+  NFT_AVATAR = 'BTD_nft_avatar',
+  IS_RETWEET_FROM = 'BTD_is_retweet_from',
+  MUTE_USER_KEYWORD = 'BTD_mute_user_keyword',
+  REGEX_DISPLAYNAME = 'BTD_mute_displayname',
+  REGEX = 'BTD_regex',
+  USER_REGEX = 'BTD_user_regex',
+  MUTE_QUOTES = 'BTD_mute_quotes',
+  USER_BIOGRAPHIES = 'BTD_user_biographies',
+  DEFAULT_AVATARS = 'BTD_default_avatars',
+  FOLLOWER_COUNT_LESS_THAN = 'BTD_follower_count_less_than',
+  FOLLOWER_COUNT_GREATER_THAN = 'BTD_follower_count_greater_than',
+  SPECIFIC_TWEET = 'BTD_specific_tweet',
+}
+
+export const RAMEFilters = makeEnumRuntimeType<AMEFilters>(AMEFilters);
+
 export const setupAME = makeBTDModule(({TD, jq}) => {
   // Save references of original functions
   TD.vo.Filter.prototype._getDisplayType = TD.vo.Filter.prototype.getDisplayType;
   TD.vo.Filter.prototype._pass = TD.vo.Filter.prototype.pass;
+
+  TD.controller.filterManager._addFilter = TD.controller.filterManager.addFilter;
+  TD.controller.filterManager._removeFilter = TD.controller.filterManager.removeFilter;
 
   // If we're running in debug mode, this already exists
   if (!window.BTD) {
@@ -63,7 +85,7 @@ export const setupAME = makeBTDModule(({TD, jq}) => {
 
   // Custom filters
   const AmeFilters: AMEFiltersMap = {
-    BTD_nft_avatar: {
+    [AMEFilters.NFT_AVATAR]: {
       display: {
         global: false,
         options: false,
@@ -80,7 +102,7 @@ export const setupAME = makeBTDModule(({TD, jq}) => {
         return e.user.hasNftAvatar === false;
       },
     },
-    BTD_specific_tweet: {
+    [AMEFilters.SPECIFIC_TWEET]: {
       name: 'Specific tweet',
       descriptor: 'specific tweet',
       placeholder: 'ID of tweet',
@@ -96,7 +118,7 @@ export const setupAME = makeBTDModule(({TD, jq}) => {
         return true;
       },
     },
-    BTD_is_retweet_from: {
+    [AMEFilters.IS_RETWEET_FROM]: {
       display: {
         actions: true,
       },
@@ -107,7 +129,7 @@ export const setupAME = makeBTDModule(({TD, jq}) => {
         return !(e.isRetweetedStatus() && t.value === e.user.screenName.toLowerCase());
       },
     },
-    BTD_mute_user_keyword: {
+    [AMEFilters.MUTE_USER_KEYWORD]: {
       display: {
         global: true,
       },
@@ -125,7 +147,7 @@ export const setupAME = makeBTDModule(({TD, jq}) => {
         );
       },
     },
-    BTD_mute_displayname: {
+    [AMEFilters.REGEX_DISPLAYNAME]: {
       display: {
         global: true,
       },
@@ -139,7 +161,7 @@ export const setupAME = makeBTDModule(({TD, jq}) => {
         return !e.user.name.match(regex);
       },
     },
-    BTD_regex: {
+    [AMEFilters.REGEX]: {
       display: {
         global: true,
       },
@@ -152,7 +174,7 @@ export const setupAME = makeBTDModule(({TD, jq}) => {
         return !e.getFilterableText().match(regex);
       },
     },
-    BTD_user_regex: {
+    [AMEFilters.USER_REGEX]: {
       display: {
         global: true,
       },
@@ -166,7 +188,7 @@ export const setupAME = makeBTDModule(({TD, jq}) => {
         return !e.user.screenName.match(regex);
       },
     },
-    BTD_mute_quotes: {
+    [AMEFilters.MUTE_QUOTES]: {
       display: {
         actions: true,
       },
@@ -179,7 +201,7 @@ export const setupAME = makeBTDModule(({TD, jq}) => {
         return !(e.isQuoteStatus && t.value === e.user.screenName.toLowerCase());
       },
     },
-    BTD_user_biographies: {
+    [AMEFilters.USER_BIOGRAPHIES]: {
       display: {
         global: true,
       },
@@ -192,7 +214,7 @@ export const setupAME = makeBTDModule(({TD, jq}) => {
         return !e.user.description.toLowerCase().includes(t.value);
       },
     },
-    BTD_default_avatars: {
+    [AMEFilters.DEFAULT_AVATARS]: {
       display: {
         global: true,
       },
@@ -205,7 +227,7 @@ export const setupAME = makeBTDModule(({TD, jq}) => {
         return !e.user.profileImageURL.includes('default');
       },
     },
-    BTD_follower_count_less_than: {
+    [AMEFilters.FOLLOWER_COUNT_LESS_THAN]: {
       display: {
         global: true,
       },
@@ -218,7 +240,7 @@ export const setupAME = makeBTDModule(({TD, jq}) => {
         return !(e.user.followersCount < parseInt(t.value, 10));
       },
     },
-    BTD_follower_count_greater_than: {
+    [AMEFilters.FOLLOWER_COUNT_GREATER_THAN]: {
       display: {
         global: true,
       },
@@ -233,20 +255,47 @@ export const setupAME = makeBTDModule(({TD, jq}) => {
     },
   };
 
+  const muteTypeAllowlist = [
+    AMEFilters.DEFAULT_AVATARS,
+    AMEFilters.FOLLOWER_COUNT_GREATER_THAN,
+    AMEFilters.FOLLOWER_COUNT_LESS_THAN,
+    AMEFilters.MUTE_USER_KEYWORD,
+    AMEFilters.NFT_AVATAR,
+    AMEFilters.REGEX_DISPLAYNAME,
+    AMEFilters.USER_BIOGRAPHIES,
+    AMEFilters.USER_REGEX,
+  ];
+
   // Custom pass function to apply our filters
   TD.vo.Filter.prototype.pass = function pass(e) {
-    if (this.type.startsWith('BTD')) {
+    if (RAMEFilters.is(this.type)) {
       const t = this;
       e = this._getFilterTarget(e);
 
-      return AmeFilters[this.type].function(t, e);
+      const shouldDisplay = AmeFilters[this.type].function(t, e);
+
+      if (!shouldDisplay && muteTypeAllowlist.includes(this.type)) {
+        maybeLogMuteCatch(e, this);
+      }
+      return shouldDisplay;
     }
-    return this._pass(e);
+
+    const shouldDisplay = this._pass(e);
+
+    return shouldDisplay;
+  };
+
+  TD.controller.filterManager.removeFilter = function removeFilter(filter) {
+    const foundFilter = TD.controller.filterManager.getAll().find((f) => f.id === filter.id);
+    if (foundFilter) {
+      removeCatchesByFilter(foundFilter);
+    }
+    return this._removeFilter(filter);
   };
 
   // Custom display type function to show proper description in filter list
   TD.vo.Filter.prototype.getDisplayType = function getDisplayType() {
-    if (AmeFilters[this.type] !== undefined) {
+    if (RAMEFilters.is(this.type)) {
       return AmeFilters[this.type].descriptor;
     }
     return this._getDisplayType();
@@ -258,6 +307,9 @@ export const setupAME = makeBTDModule(({TD, jq}) => {
     let filterString = '';
 
     filters.forEach((filter) => {
+      if (!RAMEFilters.is(filter)) {
+        return;
+      }
       const fil = AmeFilters[filter];
       if (fil.display && fil.display.global) {
         filterString += `<option value="${filter}">{{_i}}${fil.name}{{/i}}</option>`;
@@ -273,6 +325,9 @@ export const setupAME = makeBTDModule(({TD, jq}) => {
     let filterString = '';
 
     filters.forEach((filter) => {
+      if (!RAMEFilters.is(filter)) {
+        return;
+      }
       const fil = AmeFilters[filter];
       if (fil.display && fil.display.actions) {
         const templateString =
@@ -297,7 +352,7 @@ export const setupAME = makeBTDModule(({TD, jq}) => {
     const options = e.target.options;
     const filter = e.target.options[options.selectedIndex].value;
 
-    if (filter.startsWith('BTD')) {
+    if (RAMEFilters.is(filter)) {
       jq('.js-filter-input').attr('placeholder', AmeFilters[filter].placeholder);
     }
   });
